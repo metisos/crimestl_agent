@@ -280,8 +280,8 @@ def chat():
             
         logger.info(f"Processing question: {question}")
         
-        # Get direct answer from CSV data
-        answer = crime_agent.query_csv_data(question)
+        # Get enhanced answer using Ollama AI
+        answer = crime_agent.answer_question(question)
         
         if not answer:
             return jsonify({
@@ -299,7 +299,49 @@ def chat():
         return jsonify({
             'answer': 'An error occurred while processing your question. Please try again.',
             'success': False
-        }), 500
+        })
+
+@app.route('/ai_insights', methods=['POST'])
+def get_ai_insights():
+    try:
+        data = request.get_json()
+        insight_type = data.get('type', 'general')
+        time_range = data.get('time_range', 'all')
+        
+        # Get base insights from database
+        insights = crime_agent.get_insights(limit=5, insight_type=insight_type)
+        
+        # Format insights for AI analysis
+        insights_text = "\n".join([f"- {i['text']}" for i in insights])
+        
+        # Create prompt for AI analysis
+        prompt = f"""As a crime analysis AI assistant, analyze these recent crime insights and provide strategic recommendations:
+
+Recent {insight_type} Insights ({time_range}):
+{insights_text}
+
+Please provide:
+1. Pattern Analysis: What patterns or trends do you observe?
+2. Risk Assessment: What are the key public safety concerns?
+3. Recommendations: What specific actions could help address these issues?
+
+Keep your response focused on actionable insights for public safety."""
+
+        # Get AI-enhanced analysis
+        ai_analysis = crime_agent.ollama.invoke(prompt)
+        
+        return jsonify({
+            'insights': insights,
+            'ai_analysis': ai_analysis,
+            'success': True
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in AI insights endpoint: {str(e)}")
+        return jsonify({
+            'error': 'An error occurred while generating AI insights.',
+            'success': False
+        })
 
 if __name__ == '__main__':
     try:

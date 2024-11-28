@@ -3,8 +3,33 @@ import numpy as np
 from datetime import datetime
 from database import InsightDatabase
 import logging
+import subprocess  # Added for Ollama model
 
 logger = logging.getLogger(__name__)
+
+class OllamaLocalModel:
+    """Class to invoke the local Ollama model using CLI commands."""
+    def __init__(self, model="llama3.2"):
+        self.model = model
+    
+    def invoke(self, prompt):
+        """Generate a response from the Ollama model using the CLI."""
+        try:
+            # Limit prompt length to 4000 characters
+            if len(prompt) > 4000:
+                prompt = prompt[:3900] + "... [truncated for length]"
+            
+            result = subprocess.run(
+                ["ollama", "run", self.model],
+                input=prompt,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            return result.stdout.strip()
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Ollama error: {e.stderr}")
+            return f"Error: {e.stderr}"
 
 class CrimeAgent:
     def __init__(self, csv_file='October2024.csv'):
@@ -12,6 +37,7 @@ class CrimeAgent:
         self.db = InsightDatabase()  # Initialize database connection
         self.csv_file = csv_file
         self.current_data = None
+        self.ollama = OllamaLocalModel()  # Initialize Ollama model
         self.crime_categories = {
             'Violent Crimes': [
                 'HOMICIDE', 'ASSAULT', 'ROBBERY', 'AGGRAVATED ASSAULT', 
@@ -429,8 +455,24 @@ class CrimeAgent:
         """Answer questions about crime patterns and insights"""
         try:
             # First try to get answer directly from CSV data
-            answer = self.query_csv_data(question)
-            return answer
+            data_answer = self.query_csv_data(question)
+            
+            # Use Ollama to enhance the answer with insights
+            prompt = f"""As a crime analysis AI assistant, analyze this crime data and provide additional insights:
+
+Question: {question}
+
+Data Analysis:
+{data_answer}
+
+Please provide additional insights, patterns, or recommendations based on this data.
+Keep your response focused and relevant to public safety."""
+
+            ollama_insights = self.ollama.invoke(prompt)
+            
+            # Combine both answers
+            full_answer = f"{data_answer}\n\nAdditional Insights:\n{ollama_insights}"
+            return full_answer
             
         except Exception as e:
             logger.error(f"Error answering question: {str(e)}")
