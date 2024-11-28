@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>St. Louis Crime Intelligence Dashboard</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        body {
+            background-image: url('https://res.cloudinary.com/ddqz7fp5i/image/upload/v1708832091/police-cars-night-car-chasing-fog-background-emergency-response-speeding-to-scene-crime-selective-focus-pselective-148039405_f9xpjo.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+
+        .Title {
+            background-color: rgba(3, 3, 3, 0.9);
+            border-radius: 15px;
+            color: #f7f7f7;
+            padding: 25px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+        .container-fluid {
+            background-color: rgba(2, 7, 46, 0.9);
+            border-radius: 15px;
+            color: #080808;
+            padding: 25px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+        #map {
+            height: 40vh;
+            width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .dashboard-card {
+            background: rgba(196, 197, 201, 0.9);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 10px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(5px);
+        }
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .insights-container {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 10px 0;
+        }
+        .insight-item {
+            padding: 10px;
+            border-left: 4px solid #007bff;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            border-radius: 0 4px 4px 0;
+        }
+        .insight-item.error {
+            border-left-color: #dc3545;
+        }
+        .insight-item.clustering {
+            border-left-color: #28a745;
+        }
+        .insight-item.anomalies {
+            border-left-color: #ffc107;
+        }
+        .insight-item.ai_analysis {
+            border-left-color: #6f42c1;
+        }
+        .insight-timestamp {
+            font-size: 0.8em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .legend {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .legend-item {
+            margin: 5px 0;
+        }
+        .legend-color {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            border-radius: 50%;
+        }
+        .popup-content {
+            padding: 10px;
+            max-width: 300px;
+        }
+        .popup-content h6 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-weight: bold;
+        }
+        .popup-content p {
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+        .popup-content strong {
+            color: #666;
+        }
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .badge {
+            font-size: 0.8em;
+            padding: 4px 8px;
+        }
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            height: 300px;
+        }
+        .chat-messages {
+            flex: 1;
+            max-height: 220px;
+            overflow-y: auto;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .chat-message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .user-message {
+            background: #007bff;
+            color: white;
+            margin-left: 20%;
+        }
+        .ai-message {
+            background: #e9ecef;
+            color: #212529;
+            margin-right: 20%;
+        }
+        .chat-input-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 10px 0;
+        }
+        .message-timestamp {
+            font-size: 0.8em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .map-controls {
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .category-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .category-filter {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            border-radius: 15px;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .category-filter:hover {
+            transform: translateY(-1px);
+        }
+        .category-filter.active {
+            background: #007bff;
+            color: white;
+        }
+        .category-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container-fluid py-4">
+        <h1 class="Title  " >St. Louis City Crime Intelligence Agent - NIBRS </h1>
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="dashboard-card">
+                    <div class="map-controls mb-3">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h5>Crime Categories</h5>
+                                <div id="category-filters" class="category-filters">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading categories...</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <h5>Year Filter</h5>
+                                <select id="year-filter" class="form-select">
+                                    <option value="all">All Years</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="map"></div>
+                </div>
+                <div class="dashboard-card mt-3">
+                    <h4>Ask Metis OS</h4>
+                    <div class="chat-container">
+                        <div id="chat-messages" class="chat-messages"></div>
+                        <div class="chat-input-container">
+                            <input type="text" id="chat-input" class="form-control" placeholder="Ask a question about the crime data...">
+                            <button id="send-button" class="btn btn-primary mt-2">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="dashboard-card">
+                    <h4>Crime Statistics</h4>
+                    <div id="stats" class="stats-container"></div>
+                </div>
+                <div class="dashboard-card mt-3">
+                    <h4>AI Insights</h4>
+                    <div id="insights" class="insights-container">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<!-- Temporal Analysis Section -->
+<div class="dashboard-card mt-3">
+    <h4>Temporal Analysis</h4>
+    <div class="row">
+        
+        <div class="col-md-6">
+            <canvas id="daily-chart"></canvas>
+        </div>
+    </div>
+    <div class="row mt-3">
+        <div class="col-md-12">
+            <canvas id="monthly-chart"></canvas>
+        </div>
+    </div>
+    <div id="error-message" style="display: none; color: red;"></div>
+    <div class="row mt-3">
+        <div class="col-md-6">
+            <h5>Hourly Metadata</h5>
+            <div class="stat-card">
+                <h6>Peak Hour</h6>
+                <p id="peak-hour">N/A</p>
+            </div>
+            <div class="stat-card">
+                <h6>Quietest Hour</h6>
+                <p id="quiet-hour">N/A</p>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <h5>Daily Metadata</h5>
+            <div class="stat-card">
+                <h6>Busiest Day</h6>
+                <p id="busiest-day">N/A</p>
+            </div>
+            <div class="stat-card">
+                <h6>Quietest Day</h6>
+                <p id="quietest-day">N/A</p>
+            </div>
+        </div>
+    </div>
+    <div class="row mt-3">
+        <div class="col-md-6">
+            <h5>Monthly Metadata</h5>
+            <div class="stat-card">
+                <h6>Busiest Month</h6>
+                <p id="busiest-month">N/A</p>
+            </div>
+            <div class="stat-card">
+                <h6>Quietest Month</h6>
+                <p id="quietest-month">N/A</p>
+            </div>
+        </div>
+    </div>
+</div>
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Add this in the <head> section -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        // Initialize the map centered on St. Louis
+        const map = L.map('map').setView([38.6270, -90.1994], 12);
+        
+        // Add the OpenStreetMap tiles
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: ' OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Define category colors
+        const categoryColors = {
+            'Violent Crimes': '#dc3545',
+            'Property Crimes': '#ffc107',
+            'Drug Crimes': '#17a2b8',
+            'Public Order': '#6c757d',
+            'Other': '#20c997'
+        };
+        // Initialize charts
+        let hourlyChart, dailyChart, monthlyChart;
+        
+        // Function to update temporal charts
+        function updateTemporalCharts() {
+            fetch('/get_temporal_stats')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Temporal data:', data);
+                    
+             
+                    // Update daily chart
+                    const daysOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                    const dailyData = data.temporal_patterns.daily;
+                    const dailyValues = daysOrder.map(day => dailyData[day] || 0);
+
+                    if (dailyChart) {
+                        dailyChart.destroy();
+                    }
+                    const dailyCtx = document.getElementById('daily-chart').getContext('2d');
+                    dailyChart = new Chart(dailyCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: daysOrder,
+                            datasets: [{
+                                label: 'Crimes by Day',
+                                data: dailyValues,
+                                backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                                borderColor: 'rgb(75, 192, 192)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        stepSize: 1
+                                    }
+                                }
+                            },
+                            plugins: {
+                                title: {
+                                    display: true,
+                                    text: 'Crime Incidents by Day of Week'
+                                }
+                            }
+                        }
+                    });
+
+                    // Update monthly chart
+                    const monthsOrder = ['January', 'February', 'March', 'April', 'May', 'June', 
+                                       'July', 'August', 'September', 'October', 'November', 'December'];
+                    const monthlyData = data.temporal_patterns.monthly;
+                    const monthlyValues = monthsOrder.map(month => monthlyData[month] || 0);
+
+                    if (monthlyChart) {
+                        monthlyChart.destroy();
+                    }
+                    const monthlyCtx = document.getElementById('monthly-chart').getContext('2d');
+                    monthlyChart = new Chart(monthlyCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: monthsOrder,
+                            datasets: [{
+                                label: 'Crimes by Month',
+                                data: monthlyValues,
+                                backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                                borderColor: 'rgb(255, 99, 132)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        stepSize: 1
+                                    }
+                                }
+                            },
+                            plugins: {
+                                title: {
+                                    display: true,
+                                    text: 'Crime Incidents by Month'
+                                }
+                            }
+                        }
+                    });
+
+                    // Update metadata displays
+                    if (data.metadata) {
+                        // Hourly metadata
+                        if (data.metadata.hourly) {
+                            document.getElementById('peak-hour').textContent = 
+                                `${data.metadata.hourly.peak_hour}:00 (${data.metadata.hourly.peak_count} incidents)`;
+                        }
+                        // Daily metadata
+                        if (data.metadata.daily) {
+                            document.getElementById('busiest-day').textContent = 
+                                `${data.metadata.daily.busiest_day} (${data.metadata.daily.peak_count} incidents)`;
+                        }
+                        // Monthly metadata
+                        if (data.metadata.monthly) {
+                            document.getElementById('busiest-month').textContent = 
+                                `${data.metadata.monthly.busiest_month} (${data.metadata.monthly.peak_count} incidents)`;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating temporal charts:', error);
+                    document.getElementById('error-message').textContent = 'Error loading temporal data';
+                    document.getElementById('error-message').style.display = 'block';
+                });
+        }
+
+        // Function to update insights
+        function updateInsights() {
+            fetch('/get_insights')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data || !data.insights || !Array.isArray(data.insights)) {
+                        console.error('Invalid insights data format:', data);
+                        return;
+                    }
+
+                    const insightsList = document.getElementById('insights');
+                    insightsList.innerHTML = '';
+
+                    data.insights.forEach(insight => {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+                        
+                        // Create insight text element
+                        const textDiv = document.createElement('div');
+                        textDiv.className = 'insight-text';
+                        textDiv.textContent = insight.text;
+                        
+                        // Create metadata badge if exists
+                        const metadataDiv = document.createElement('div');
+                        metadataDiv.className = 'insight-metadata';
+                        if (insight.confidence) {
+                            const confidenceBadge = document.createElement('span');
+                            confidenceBadge.className = 'badge bg-info';
+                            confidenceBadge.textContent = `Confidence: ${(insight.confidence * 100).toFixed(0)}%`;
+                            metadataDiv.appendChild(confidenceBadge);
+                        }
+                        
+                        // Create type badge
+                        const typeBadge = document.createElement('span');
+                        typeBadge.className = 'badge bg-secondary ms-2';
+                        typeBadge.textContent = insight.type;
+                        metadataDiv.appendChild(typeBadge);
+                        
+                        li.appendChild(textDiv);
+                        li.appendChild(metadataDiv);
+                        insightsList.appendChild(li);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching insights:', error);
+                });
+        }
+
+        // Store markers by category and year
+        let markersByCategory = {};
+        let activeCategories = new Set(Object.keys(categoryColors));
+        let activeYear = 'all';
+        let allMarkers = [];
+
+        // Function to filter markers by year
+        function filterMarkersByYear(year) {
+            activeYear = year;
+            Object.values(markersByCategory).forEach(markers => {
+                markers.forEach(marker => {
+                    if (year === 'all' || marker.year === parseInt(year)) {
+                        if (activeCategories.has(marker.category)) {
+                            map.addLayer(marker);
+                        }
+                    } else {
+                        map.removeLayer(marker);
+                    }
+                });
+            });
+        }
+
+        // Add year filter change event listener
+        document.getElementById('year-filter').addEventListener('change', function(event) {
+            filterMarkersByYear(event.target.value);
+        });
+
+        // Function to toggle category visibility
+        function toggleCategory(category) {
+            const categoryFilter = document.querySelector(`[data-category="${category}"]`);
+            if (activeCategories.has(category)) {
+                activeCategories.delete(category);
+                categoryFilter.classList.remove('active');
+                if (markersByCategory[category]) {
+                    markersByCategory[category].forEach(marker => {
+                        map.removeLayer(marker);
+                    });
+                }
+            } else {
+                activeCategories.add(category);
+                categoryFilter.classList.add('active');
+                if (markersByCategory[category]) {
+                    markersByCategory[category].forEach(marker => {
+                        if (activeYear === 'all' || marker.year === parseInt(activeYear)) {
+                            map.addLayer(marker);
+                        }
+                    });
+                }
+            }
+        }
+
+        // Load crime categories and create filters
+        fetch('/get_crime_categories')
+            .then(response => response.json())
+            .then(categories => {
+                const filtersContainer = document.getElementById('category-filters');
+                filtersContainer.innerHTML = categories.map(category => `
+                    <div class="category-filter active" data-category="${category}" onclick="toggleCategory('${category}')">
+                        <span class="category-color" style="background: ${categoryColors[category]}"></span>
+                        ${category}
+                    </div>
+                `).join('');
+            });
+
+        // Function to send message
+        function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const messages = document.getElementById('chat-messages');
+            const question = input.value.trim();
+
+            if (!question) return;
+
+            // Add user message
+            const userMessageDiv = document.createElement('div');
+            userMessageDiv.className = 'user-message';
+            userMessageDiv.textContent = question;
+            messages.appendChild(userMessageDiv);
+
+            // Clear input
+            input.value = '';
+
+            // Scroll to bottom
+            messages.scrollTop = messages.scrollHeight;
+
+            // Send to backend
+            fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ question: question })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Create system message element
+                const systemMessageDiv = document.createElement('div');
+                systemMessageDiv.className = 'system-message';
+                
+                if (data.success) {
+                    systemMessageDiv.textContent = data.answer;
+                } else {
+                    systemMessageDiv.className += ' error';
+                    systemMessageDiv.textContent = 'Sorry, I encountered an error processing your question.';
+                }
+                
+                // Add system message
+                messages.appendChild(systemMessageDiv);
+                
+                // Scroll to bottom again
+                messages.scrollTop = messages.scrollHeight;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'system-message error';
+                errorDiv.textContent = 'Sorry, there was an error communicating with the server.';
+                messages.appendChild(errorDiv);
+                messages.scrollTop = messages.scrollHeight;
+            });
+        }
+
+        // Handle Enter key in chat input
+        document.getElementById('chat-input').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Fetch and display crime data
+        fetch('/get_crime_data')
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                console.log('Received data:', data);
+                
+                // Initialize statistics object
+                let stats = {
+                    categories: {},
+                    neighborhoods: {},
+                    anomalies: 0,
+                    total: 0
+                };
+
+                // Initialize markersByCategory
+                Object.keys(categoryColors).forEach(category => {
+                    markersByCategory[category] = [];
+                    stats.categories[category] = 0;
+                });
+
+                // Add markers for each crime
+                data.forEach(crime => {
+                    // Update stats
+                    const category = crime.category || 'Other';
+                    stats.categories[category] = (stats.categories[category] || 0) + 1;
+                    stats.total++;
+                    
+                    if (crime.is_anomaly) {
+                        stats.anomalies++;
+                    }
+                    
+                    // Update neighborhood stats
+                    if (crime.neighborhood) {
+                        stats.neighborhoods[crime.neighborhood] = (stats.neighborhoods[crime.neighborhood] || 0) + 1;
+                    }
+
+                    const marker = L.circleMarker([crime.latitude, crime.longitude], {
+                        radius: 8,
+                        fillColor: categoryColors[crime.category] || '#999',
+                        color: '#fff',
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    });
+
+                    // Store year and category with marker
+                    marker.year = crime.year;
+                    marker.category = crime.category;
+
+                    // Create popup content
+                    const popupContent = `
+                        <div class="popup-content">
+                            <h6>${crime.crime_type}</h6>
+                            <p><strong>Date:</strong> ${crime.date}</p>
+                            <p><strong>Time:</strong> ${crime.time}</p>
+                            <p><strong>Location:</strong> ${crime.neighborhood}</p>
+                            <p><strong>Category:</strong> ${crime.category}</p>
+                            <p><strong>Year:</strong> ${crime.year}</p>
+                            ${crime.is_anomaly ? '<p class="text-danger"><strong>Anomaly Detected</strong></p>' : ''}
+                        </div>
+                    `;
+                    marker.bindPopup(popupContent);
+
+                    // Store marker in category array
+                    if (!markersByCategory[crime.category]) {
+                        markersByCategory[crime.category] = [];
+                    }
+                    markersByCategory[crime.category].push(marker);
+                    allMarkers.push(marker);
+
+                    // Add marker to map if category is active
+                    if (activeCategories.has(crime.category)) {
+                        marker.addTo(map);
+                    }
+                });
+
+                // Get unique years and populate year filter
+                const years = [...new Set(allMarkers.map(marker => marker.year))].sort();
+                const yearFilter = document.getElementById('year-filter');
+                years.forEach(year => {
+                    const option = document.createElement('option');
+                    option.value = year;
+                    option.textContent = year;
+                    yearFilter.appendChild(option);
+                });
+
+                // Sort neighborhoods by crime count
+                const sortedNeighborhoods = Object.entries(stats.neighborhoods)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 5);
+
+                // Update statistics display
+                const statsContainer = document.getElementById('stats');
+                statsContainer.innerHTML = `
+                    <div class="stat-card">
+                        <h5>Total Incidents</h5>
+                        <p>${stats.total}</p>
+                    </div>
+                    ${Object.entries(stats.categories)
+                        .map(([category, count]) => `
+                            <div class="stat-card">
+                                <h5>${category}</h5>
+                                <p>${count} (${((count/stats.total)*100).toFixed(1)}%)</p>
+                            </div>
+                        `).join('')}
+                    <div class="stat-card">
+                        <h5>Top 5 Neighborhoods</h5>
+                        ${sortedNeighborhoods.map(([hood, count]) => 
+                            `<p>${hood}: ${count} (${((count/stats.total)*100).toFixed(1)}%)</p>`
+                        ).join('')}
+                    </div>
+                    <div class="stat-card">
+                        <h5>Anomalies</h5>
+                        <p>${stats.anomalies} (${((stats.anomalies/stats.total)*100).toFixed(1)}%)</p>
+                    </div>
+                `;
+            })
+            .catch(error => {
+                console.error('Error fetching crime data:', error);
+                alert('Error loading crime data. Please check the console for details.');
+            });
+
+        // Initial load of temporal charts
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("DOM loaded, initializing charts...");
+            updateTemporalCharts();
+        });
+
+        // Update insights every 30 seconds
+        updateInsights();
+        setInterval(updateInsights, 30000);
+    </script>
+</body>
+</html>
